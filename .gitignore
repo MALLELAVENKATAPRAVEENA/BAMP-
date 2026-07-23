@@ -33,4 +33,5 @@ yarn-error.log*
 # Uploads and temporary files
 web/backend/uploads/*
 !web/backend/uploads/.gitkeep
+web/backend/src/config/serviceAccountKey.json
 C:/Users/venka/.gemini/antigravity-ide/brain/*
