@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+/.pnp
+.pnp.js
+
+# Testing
+/coverage
+
+# Production
+/dist
+/build
+
+# Miscellaneous
+.DS_Store
+.env
+.env.local
+.env.production
+.env.development
+*.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDEs
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Uploads and temporary files
+web/backend/uploads/*
+!web/backend/uploads/.gitkeep
+C:/Users/venka/.gemini/antigravity-ide/brain/*
