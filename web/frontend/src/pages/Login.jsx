@@ -129,46 +129,8 @@ const Login = () => {
             </button>
           </form>
 
-          {/* Social Sign In Divider */}
-          <div className="relative my-8">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-slate-200 dark:border-slate-800"></div>
-            </div>
-            <div className="relative flex justify-center text-xs uppercase tracking-wider font-bold">
-              <span className="bg-white dark:bg-slate-900 px-4 text-slate-400">Or secure access via</span>
-            </div>
-          </div>
-
-          {/* Google Sign In */}
-          <button
-            type="button"
-            onClick={handleGoogleAuth}
-            disabled={isLoading}
-            className="w-full py-3.5 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700/80 border border-slate-200 dark:border-slate-850 rounded-2xl flex items-center justify-center space-x-3 transition-colors duration-200 font-semibold text-sm"
-          >
-            <svg className="h-5 w-5" viewBox="0 0 24 24">
-              <path
-                fill="#EA4335"
-                d="M12 5.04c1.7 0 3.2.6 4.4 1.7l3.3-3.3C17.7 1.4 15 0 12 0 7.4 0 3.5 2.7 1.7 6.6l3.9 3C6.5 6.9 9 5.04 12 5.04z"
-              />
-              <path
-                fill="#4285F4"
-                d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.4h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.1-2 3.7-4.9 3.7-8.7z"
-              />
-              <path
-                fill="#FBBC05"
-                d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3s.2-1.6.4-2.3L1.7 7.2c-.8 1.7-1.3 3.5-1.3 5.3s.5 3.6 1.3 5.3l3.9-2.9z"
-              />
-              <path
-                fill="#34A853"
-                d="M12 24c3.2 0 6-.9 8-2.6l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-1.9-6.4-4.5L1.7 18.1C3.5 21.8 7.4 24 12 24z"
-              />
-            </svg>
-            <span>Continue with Google</span>
-          </button>
-
           <p className="text-center text-xs mt-6 font-semibold text-slate-500">
-            Need an account? <Link to="/signup" className="text-medical-500 hover:underline">Create Account</Link>
+            Need an account? <Link to="/signup" className="text-medical-500 hover:underline font-bold">Create Account</Link>
           </p>
         </div>
       </div>
