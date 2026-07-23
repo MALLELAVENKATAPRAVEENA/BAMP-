@@ -41,20 +41,15 @@ const LoginSignup = () => {
     setIsLoading(true);
     try {
       if (isLogin) {
-        // Run login endpoint
-        const response = await login(data.emailAddress, data.password);
-        toast.success(response.message || 'Verification code dispatched to your email.');
-        setTimeout(() => {
-          navigate('/otp-verify', { state: { email: data.emailAddress, demoOtp: response.demoOtp } });
-        }, 1200);
+        await login(data.emailAddress, data.password);
+        toast.success('Signed in successfully.');
       } else {
-        // Run signup endpoint
-        const response = await signup(data.fullName, data.emailAddress, data.password);
-        toast.success(response.message || 'OTP successfully sent to your email.');
-        setTimeout(() => {
-          navigate('/otp-verify', { state: { email: data.emailAddress, demoOtp: response.demoOtp } });
-        }, 1200);
+        await signup(data.fullName, data.emailAddress, data.password);
+        toast.success('Account created and registered successfully!');
       }
+      setTimeout(() => {
+        navigate('/access-selection');
+      }, 1000);
     } catch (err) {
       toast.error(err.message || 'Authentication request rejected.');
     } finally {

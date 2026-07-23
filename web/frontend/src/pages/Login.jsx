@@ -23,11 +23,11 @@ const Login = () => {
   const onSubmit = async (data) => {
     setIsLoading(true);
     try {
-      const response = await login(data.emailAddress, data.password);
-      toast.success(response.message || 'OTP verification code sent to your email.');
+      await login(data.emailAddress, data.password);
+      toast.success('Signed in successfully.');
       setTimeout(() => {
-        navigate('/otp-verify', { state: { email: data.emailAddress, demoOtp: response.demoOtp } });
-      }, 1200);
+        navigate('/access-selection');
+      }, 1000);
     } catch (err) {
       toast.error(err.message || 'Authentication request rejected.');
     } finally {
