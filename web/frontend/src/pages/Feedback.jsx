@@ -4,18 +4,27 @@ import { Heart, Send, Check } from 'lucide-react';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
+import { useAuth } from '../context/AuthContext';
+import { firestoreService } from '../services/firestoreService';
+
 const Feedback = () => {
   const [rating, setRating] = useState(5);
   const [isLoading, setIsLoading] = useState(false);
+  const { user } = useAuth();
   const { register, handleSubmit, reset } = useForm();
 
-  const onSubmit = (data) => {
+  const onSubmit = async (data) => {
     setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
-      toast.success("Feedback submitted! Thank you for helping improve the platform.");
+    try {
+      await firestoreService.submitFeedback(user?.uid || 'anonymous', data.comments, rating);
+      await firestoreService.logAuditEvent(user?.uid, 'SUBMIT_FEEDBACK', 'feedback');
+      toast.success("Feedback submitted! Stored in Cloud Firestore.");
       reset();
-    }, 1000);
+    } catch (err) {
+      toast.error(err.message || "Feedback submission failed.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (

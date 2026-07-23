@@ -5,49 +5,20 @@ import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import axios from 'axios';
 
+import { useNotifications } from '../hooks/useNotifications';
+import { firestoreService } from '../services/firestoreService';
+import { useAuth } from '../context/AuthContext';
+
 const Notifications = () => {
-  const [notifications, setNotifications] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    fetchNotifications();
-  }, []);
-
-  const fetchNotifications = async () => {
-    setIsLoading(true);
-    try {
-      const res = await axios.get('/api/notifications');
-      if (res.data.success) {
-        setNotifications(res.data.data);
-      }
-    } catch (err) {
-      console.error("Failed to load alerts feed:", err.message);
-      // Fallback notifications state
-      setNotifications([
-        { id: "N-101", title: "AI Analysis Completed", message: "BAMP success outcome analysis for Aarav Sharma is complete. Click to review.", type: "success", timestamp: new Date(Date.now() - 4*24*60*60*1000).toISOString(), read: false },
-        { id: "N-102", title: "New Patient Registered", message: "Rohan Das was successfully added to the patient directory.", type: "info", timestamp: new Date(Date.now() - 1*24*60*60*1000).toISOString(), read: true },
-        { id: "N-103", title: "Scan Upload Complete", message: "Cephalogram upload for Priya Patel verified successfully.", type: "info", timestamp: new Date(Date.now() - 2*24*60*60*1000).toISOString(), read: false }
-      ]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const { user } = useAuth();
+  const { notifications, loading: isLoading } = useNotifications(user?.uid || 'all');
 
   const handleMarkAsRead = async (id) => {
     try {
-      const res = await axios.put(`/api/notifications/${id}/read`);
-      if (res.data.success) {
-        setNotifications(prev =>
-          prev.map(n => (n.id === id ? { ...n, read: true } : n))
-        );
-        toast.success("Alert marked as read.");
-      }
-    } catch (err) {
-      // Offline fallback
-      setNotifications(prev =>
-        prev.map(n => (n.id === id ? { ...n, read: true } : n))
-      );
+      await firestoreService.markNotificationRead(id);
       toast.success("Alert marked as read.");
+    } catch (err) {
+      toast.error("Failed to mark as read.");
     }
   };
 

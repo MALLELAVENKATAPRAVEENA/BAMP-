@@ -15,8 +15,8 @@ const Login = () => {
 
   const { register, handleSubmit, formState: { errors } } = useForm({
     defaultValues: {
-      emailAddress: 'dr.venkat@hospital.org', // Preconfigured test values
-      password: 'password123'
+      emailAddress: '',
+      password: ''
     }
   });
 
@@ -24,9 +24,9 @@ const Login = () => {
     setIsLoading(true);
     try {
       const response = await login(data.emailAddress, data.password);
-      toast.success(response.message || 'OTP successfully sent to email.');
+      toast.success(response.message || 'OTP verification code sent to your email.');
       setTimeout(() => {
-        navigate('/otp-verify', { state: { email: data.emailAddress } });
+        navigate('/otp-verify', { state: { email: data.emailAddress, demoOtp: response.demoOtp } });
       }, 1200);
     } catch (err) {
       toast.error(err.message || 'Authentication request rejected.');
@@ -59,7 +59,7 @@ const Login = () => {
 
       <div className="w-full max-w-lg z-10">
         <div className="text-center mb-8">
-          <h2 className="text-3xl font-extrabold font-sans tracking-tight">Doctor Login Station</h2>
+          <h2 className="text-3xl font-extrabold font-sans tracking-tight">Sign In</h2>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">BAMP AI outcomes evaluation dashboard access</p>
         </div>
 

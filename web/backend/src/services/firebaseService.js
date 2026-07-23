@@ -1,69 +1,37 @@
 const { db, isDemo } = require('../config/firebase');
 
-// Prepopulated Demo State
+// Fallback In-Memory Datasets
 let demoPatients = [
   {
     id: "P-1001",
+    patientId: "P-1001",
     fullName: "Aarav Sharma",
     age: 12,
     gender: "Male",
-    dob: "2014-05-12",
-    contactNumber: "+91 98765 43210",
-    emailAddress: "aarav.sharma@example.com",
-    address: "124 Medical Enclave, New Delhi, India",
-    medicalHistory: "No major systemic illnesses. Good general health.",
-    familyHistory: "Father has skeletal Class III malocclusion.",
-    chiefComplaint: "Lower teeth are in front of upper teeth (Underbite).",
-    diagnosis: "Skeletal Class III malocclusion due to maxillary hypoplasia and minor mandibular prognathism.",
+    diagnosis: "Skeletal Class III malocclusion due to maxillary hypoplasia.",
     skeletalClassification: "Class III",
     growthPattern: "Hypodivergent",
-    treatmentPlan: "Bone Anchored Maxillary Protraction (BAMP) with bone anchors in maxilla and mandible, combined with intermaxillary elastics.",
-    orthodontistNotes: "Patient has high growth potential. Excellent candidate for BAMP.",
-    createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString() // 5 days ago
+    treatmentPlan: "Bone Anchored Maxillary Protraction (BAMP) with bone anchors.",
+    createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString()
   },
   {
     id: "P-1002",
+    patientId: "P-1002",
     fullName: "Priya Patel",
     age: 11,
     gender: "Female",
-    dob: "2015-08-20",
-    contactNumber: "+91 87654 32109",
-    emailAddress: "priya.patel@example.com",
-    address: "45 Hill Road, Mumbai, India",
-    medicalHistory: "Allergic to penicillin.",
-    familyHistory: "None reported.",
-    chiefComplaint: "Upper jaw looks pushed back.",
     diagnosis: "Skeletal Class III malocclusion with severe maxillary hypoplasia.",
     skeletalClassification: "Class III",
     growthPattern: "Normodivergent",
-    treatmentPlan: "BAMP treatment using miniplates and class III elastics to stimulate maxillary growth.",
-    orthodontistNotes: "Early mixed dentition phase. Good cooperative patient.",
-    createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString() // 3 days ago
-  },
-  {
-    id: "P-1003",
-    fullName: "Rohan Das",
-    age: 13,
-    gender: "Male",
-    dob: "2013-02-14",
-    contactNumber: "+91 76543 21098",
-    emailAddress: "rohan.das@example.com",
-    address: "77 Salt Lake, Kolkata, India",
-    medicalHistory: "Asthma under control.",
-    familyHistory: "Uncle has underbite.",
-    chiefComplaint: "Difficulty chewing and facial aesthetic concerns.",
-    diagnosis: "Skeletal Class III malocclusion, maxillary retrognathism, hyperdivergent growth pattern.",
-    skeletalClassification: "Class III",
-    growthPattern: "Hyperdivergent",
-    treatmentPlan: "BAMP treatment combined with orthognathic surgery consideration post-growth if necessary. Monitoring vertical dimension.",
-    orthodontistNotes: "Vertical growth pattern requires careful anchoring vertical vectors.",
-    createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString() // 1 day ago
+    treatmentPlan: "BAMP treatment using miniplates and class III elastics.",
+    createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()
   }
 ];
 
 let demoPredictions = [
   {
     id: "PRED-001",
+    predictionId: "PRED-001",
     patientId: "P-1001",
     patientName: "Aarav Sharma",
     successProbability: 88.5,
@@ -71,148 +39,127 @@ let demoPredictions = [
     riskLevel: "Low",
     growthResponse: "High Response Potential",
     estimatedDuration: "14-16 months",
-    recommendedAction: "Proceed with standard BAMP protocol. Immediate anchor placement suggested to capitalize on late growth spurt.",
-    expectedMaxillaryAdvancement: "3.8 mm",
-    expectedSkeletalImprovement: "ANB angle improvement by +3.2°",
-    measurements: {
-      SNA: "77.5°",
-      SNB: "80.5°",
-      ANB: "-3.0°",
-      Wits: "-5.2 mm",
-      FMA: "22.5°",
-      SellaNasionLength: "71.2 mm",
-      MaxillaryLength: "45.5 mm"
-    },
-    explanation: "High success probability is driven by the patient's hypodivergent growth pattern, age (12), and active sutural growth windows. Skeletal anchorage will allow direct transmission of orthopaedic forces to the maxilla without dental side effects.",
+    recommendedAction: "Proceed with standard BAMP protocol.",
     createdAt: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString()
-  },
-  {
-    id: "PRED-002",
-    patientId: "P-1002",
-    patientName: "Priya Patel",
-    successProbability: 82.4,
-    confidenceScore: 89.5,
-    riskLevel: "Low",
-    growthResponse: "Moderate to High Response",
-    estimatedDuration: "12-14 months",
-    recommendedAction: "Initiate BAMP. Recommended elastic force: 150g per side initially, increasing to 250g after 1 month.",
-    expectedMaxillaryAdvancement: "3.2 mm",
-    expectedSkeletalImprovement: "ANB angle improvement by +2.8°",
-    measurements: {
-      SNA: "76.8°",
-      SNB: "79.2°",
-      ANB: "-2.4°",
-      Wits: "-4.1 mm",
-      FMA: "24.2°",
-      SellaNasionLength: "68.5 mm",
-      MaxillaryLength: "43.2 mm"
-    },
-    explanation: "Good skeletal response is predicted based on young age (11) and normodivergent growth pattern. Minor tooth crowding will resolve secondary to skeletal advancement.",
-    createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
   }
 ];
 
 let demoNotifications = [
   {
     id: "N-101",
+    notificationId: "N-101",
     title: "AI Analysis Completed",
-    message: "BAMP success outcome analysis for Aarav Sharma is complete. Click to review.",
+    message: "BAMP success outcome analysis for Aarav Sharma is complete.",
     type: "success",
-    timestamp: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString(),
-    read: false
-  },
-  {
-    id: "N-102",
-    title: "New Patient Registered",
-    message: "Rohan Das was successfully added to the patient directory.",
-    type: "info",
-    timestamp: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-    read: true
-  },
-  {
-    id: "N-103",
-    title: "Scan Upload Complete",
-    message: "Cephalogram upload for Priya Patel verified successfully.",
-    type: "info",
-    timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-    read: false
+    read: false,
+    createdAt: new Date().toISOString()
   }
 ];
 
-let demoSettings = {
-  doctorName: "Dr. Venkatapraveenamallela",
-  email: "dr.venkat@hospital.org",
-  specialization: "Orthodontist & Dentofacial Orthopedics",
-  hospitalName: "Advanced Orthodontic Care & AI Research Center",
-  firebaseProjectId: "bamp-ai-predictor",
-  theme: "dark",
-  notificationPrefs: {
-    email: true,
-    push: true,
-    reports: true
-  },
-  aiModelVersion: "BAMP-Net v2.4 (Active)"
-};
+let demoFeedback = [];
+let demoAuditLogs = [];
+let demoUsers = [];
 
-// Database Methods Abstraction Layer
 const firebaseService = {
-  // --- Patients ---
+  // 1. USERS COLLECTION (users/{uid})
+  async getUserProfile(uid) {
+    if (db) {
+      try {
+        const doc = await db.collection('users').doc(uid).get();
+        if (doc.exists) return { uid: doc.id, ...doc.data() };
+      } catch (e) { console.warn("[FB SERVICE] getUserProfile fallback:", e.message); }
+    }
+    return demoUsers.find(u => u.uid === uid) || null;
+  },
+
+  async createUserProfile(uid, userData) {
+    const userDoc = {
+      uid,
+      name: userData.name || userData.fullName || 'Orthodontist Doctor',
+      email: userData.email || userData.emailAddress || '',
+      role: userData.role || 'Orthodontist',
+      photoURL: userData.photoURL || '',
+      createdAt: new Date().toISOString(),
+      lastLogin: new Date().toISOString(),
+      isActive: true
+    };
+
+    if (db) {
+      try {
+        await db.collection('users').doc(uid).set(userDoc, { merge: true });
+        return userDoc;
+      } catch (e) { console.warn("[FB SERVICE] createUserProfile fallback:", e.message); }
+    }
+    demoUsers.push(userDoc);
+    return userDoc;
+  },
+
+  // 2. PATIENTS COLLECTION (patients/{patientId})
   async getPatients() {
-    if (!isDemo && db) {
-      const snapshot = await db.collection('patients').get();
-      const patients = [];
-      snapshot.forEach(doc => {
-        patients.push({ id: doc.id, ...doc.data() });
-      });
-      return patients;
+    if (db) {
+      try {
+        const snapshot = await db.collection('patients').orderBy('createdAt', 'desc').get();
+        return snapshot.docs.map(doc => ({ patientId: doc.id, id: doc.id, ...doc.data() }));
+      } catch (e) { console.warn("[FB SERVICE] getPatients fallback:", e.message); }
     }
     return demoPatients;
   },
 
   async getPatientById(id) {
-    if (!isDemo && db) {
-      const doc = await db.collection('patients').doc(id).get();
-      return doc.exists ? { id: doc.id, ...doc.data() } : null;
+    if (db) {
+      try {
+        const doc = await db.collection('patients').doc(id).get();
+        if (doc.exists) return { patientId: doc.id, id: doc.id, ...doc.data() };
+      } catch (e) { console.warn("[FB SERVICE] getPatientById fallback:", e.message); }
     }
-    return demoPatients.find(p => p.id === id) || null;
+    return demoPatients.find(p => p.id === id || p.patientId === id) || null;
   },
 
   async createPatient(patientData) {
-    if (!isDemo && db) {
-      const docRef = await db.collection('patients').add({
-        ...patientData,
-        createdAt: new Date().toISOString()
-      });
-      return { id: docRef.id, ...patientData };
-    }
     const newPatient = {
-      id: `P-${Math.floor(1000 + Math.random() * 9000)}`,
       ...patientData,
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     };
+
+    if (db) {
+      try {
+        const docRef = await db.collection('patients').add(newPatient);
+        return { patientId: docRef.id, id: docRef.id, ...newPatient };
+      } catch (e) { console.warn("[FB SERVICE] createPatient fallback:", e.message); }
+    }
+    newPatient.id = `P-${Math.floor(1000 + Math.random() * 9000)}`;
+    newPatient.patientId = newPatient.id;
     demoPatients.unshift(newPatient);
     return newPatient;
   },
 
-  async updatePatient(id, patientData) {
-    if (!isDemo && db) {
-      await db.collection('patients').doc(id).update(patientData);
-      return { id, ...patientData };
+  async updatePatient(id, updates) {
+    if (db) {
+      try {
+        await db.collection('patients').doc(id).update({
+          ...updates,
+          updatedAt: new Date().toISOString()
+        });
+        return { patientId: id, id, ...updates };
+      } catch (e) { console.warn("[FB SERVICE] updatePatient fallback:", e.message); }
     }
-    const idx = demoPatients.findIndex(p => p.id === id);
+    const idx = demoPatients.findIndex(p => p.id === id || p.patientId === id);
     if (idx !== -1) {
-      demoPatients[idx] = { ...demoPatients[idx], ...patientData };
+      demoPatients[idx] = { ...demoPatients[idx], ...updates, updatedAt: new Date().toISOString() };
       return demoPatients[idx];
     }
     return null;
   },
 
   async deletePatient(id) {
-    if (!isDemo && db) {
-      await db.collection('patients').doc(id).delete();
-      return true;
+    if (db) {
+      try {
+        await db.collection('patients').doc(id).delete();
+        return true;
+      } catch (e) { console.warn("[FB SERVICE] deletePatient fallback:", e.message); }
     }
-    const idx = demoPatients.findIndex(p => p.id === id);
+    const idx = demoPatients.findIndex(p => p.id === id || p.patientId === id);
     if (idx !== -1) {
       demoPatients.splice(idx, 1);
       return true;
@@ -220,105 +167,106 @@ const firebaseService = {
     return false;
   },
 
-  // --- Predictions ---
+  // 3. PREDICTIONS COLLECTION (predictions/{predictionId})
   async getPredictions() {
-    if (!isDemo && db) {
-      const snapshot = await db.collection('predictions').get();
-      const predictions = [];
-      snapshot.forEach(doc => {
-        predictions.push({ id: doc.id, ...doc.data() });
-      });
-      return predictions;
+    if (db) {
+      try {
+        const snapshot = await db.collection('predictions').orderBy('createdAt', 'desc').get();
+        return snapshot.docs.map(doc => ({ predictionId: doc.id, id: doc.id, ...doc.data() }));
+      } catch (e) { console.warn("[FB SERVICE] getPredictions fallback:", e.message); }
     }
     return demoPredictions;
   },
 
-  async getPredictionById(id) {
-    if (!isDemo && db) {
-      const doc = await db.collection('predictions').doc(id).get();
-      return doc.exists ? { id: doc.id, ...doc.data() } : null;
-    }
-    return demoPredictions.find(pred => pred.id === id) || null;
-  },
-
   async createPrediction(predictionData) {
-    if (!isDemo && db) {
-      const docRef = await db.collection('predictions').add({
-        ...predictionData,
-        createdAt: new Date().toISOString()
-      });
-      return { id: docRef.id, ...predictionData };
-    }
     const newPred = {
-      id: `PRED-${Math.floor(100 + Math.random() * 900)}`,
       ...predictionData,
       createdAt: new Date().toISOString()
     };
+
+    if (db) {
+      try {
+        const docRef = await db.collection('predictions').add(newPred);
+        return { predictionId: docRef.id, id: docRef.id, ...newPred };
+      } catch (e) { console.warn("[FB SERVICE] createPrediction fallback:", e.message); }
+    }
+    newPred.id = `PRED-${Math.floor(100 + Math.random() * 900)}`;
+    newPred.predictionId = newPred.id;
     demoPredictions.unshift(newPred);
     return newPred;
   },
 
-  // --- Notifications ---
+  // 4. NOTIFICATIONS COLLECTION (notifications/{notificationId})
   async getNotifications() {
-    if (!isDemo && db) {
-      const snapshot = await db.collection('notifications').orderBy('timestamp', 'desc').get();
-      const notifications = [];
-      snapshot.forEach(doc => {
-        notifications.push({ id: doc.id, ...doc.data() });
-      });
-      return notifications;
+    if (db) {
+      try {
+        const snapshot = await db.collection('notifications').orderBy('createdAt', 'desc').get();
+        return snapshot.docs.map(doc => ({ notificationId: doc.id, id: doc.id, ...doc.data() }));
+      } catch (e) { console.warn("[FB SERVICE] getNotifications fallback:", e.message); }
     }
     return demoNotifications;
   },
 
-  async createNotification(title, message, type = 'info') {
-    const notification = {
+  async createNotification(title, message, type = 'info', userId = 'all') {
+    const notif = {
       title,
       message,
       type,
-      timestamp: new Date().toISOString(),
-      read: false
+      read: false,
+      userId,
+      createdAt: new Date().toISOString()
     };
 
-    if (!isDemo && db) {
-      const docRef = await db.collection('notifications').add(notification);
-      return { id: docRef.id, ...notification };
+    if (db) {
+      try {
+        const docRef = await db.collection('notifications').add(notif);
+        return { notificationId: docRef.id, id: docRef.id, ...notif };
+      } catch (e) { console.warn("[FB SERVICE] createNotification fallback:", e.message); }
     }
-    
-    notification.id = `N-${Math.floor(100 + Math.random() * 900)}`;
-    demoNotifications.unshift(notification);
-    return notification;
+    notif.id = `N-${Math.floor(100 + Math.random() * 900)}`;
+    notif.notificationId = notif.id;
+    demoNotifications.unshift(notif);
+    return notif;
   },
 
-  async markNotificationAsRead(id) {
-    if (!isDemo && db) {
-      await db.collection('notifications').doc(id).update({ read: true });
-      return true;
+  // 5. AUDIT LOGS COLLECTION (audit_logs/{logId})
+  async logAuditEvent(userId, action, entityType, entityId = '', details = {}) {
+    const logItem = {
+      userId: userId || 'anonymous',
+      action,
+      entityType,
+      entityId,
+      details,
+      timestamp: new Date().toISOString()
+    };
+
+    if (db) {
+      try {
+        await db.collection('audit_logs').add(logItem);
+        return logItem;
+      } catch (e) { console.warn("[FB SERVICE] logAuditEvent fallback:", e.message); }
     }
-    const item = demoNotifications.find(n => n.id === id);
-    if (item) {
-      item.read = true;
-      return true;
-    }
-    return false;
+    demoAuditLogs.unshift(logItem);
+    return logItem;
   },
 
-  // --- Settings ---
-  async getSettings() {
-    if (!isDemo && db) {
-      const doc = await db.collection('settings').doc('doctor_profile').get();
-      return doc.exists ? doc.data() : demoSettings;
-    }
-    return demoSettings;
-  },
+  // 6. FEEDBACK COLLECTION (feedback/{feedbackId})
+  async submitFeedback(userId, message, rating = 5) {
+    const feedbackItem = {
+      userId,
+      message,
+      rating,
+      createdAt: new Date().toISOString()
+    };
 
-  async updateSettings(settingsData) {
-    if (!isDemo && db) {
-      await db.collection('settings').doc('doctor_profile').set(settingsData, { merge: true });
-      return settingsData;
+    if (db) {
+      try {
+        const docRef = await db.collection('feedback').add(feedbackItem);
+        return { feedbackId: docRef.id, id: docRef.id, ...feedbackItem };
+      } catch (e) { console.warn("[FB SERVICE] submitFeedback fallback:", e.message); }
     }
-    demoSettings = { ...demoSettings, ...settingsData };
-    return demoSettings;
+    demoFeedback.unshift(feedbackItem);
+    return feedbackItem;
   }
 };
 

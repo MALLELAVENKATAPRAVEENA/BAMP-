@@ -7,14 +7,20 @@ import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import axios from 'axios';
 
+import { storageService } from '../services/storageService';
+import { firestoreService } from '../services/firestoreService';
+import { useAuth } from '../context/AuthContext';
+
 const UploadScan = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useAuth();
 
   const [patients, setPatients] = useState([]);
   const [selectedPatientId, setSelectedPatientId] = useState(location.state?.patientId || '');
   const [scanType, setScanType] = useState('Lateral Cephalogram');
   const [file, setFile] = useState(null);
+  const [uploadedUrl, setUploadedUrl] = useState('');
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -22,18 +28,27 @@ const UploadScan = () => {
   useEffect(() => {
     const fetchPatients = async () => {
       try {
-        const res = await axios.get('/api/patients');
-        if (res.data.success) {
-          setPatients(res.data.data);
-          if (!selectedPatientId && res.data.data.length > 0) {
-            setSelectedPatientId(res.data.data[0].id);
+        const list = await firestoreService.getPatients();
+        if (list && list.length > 0) {
+          setPatients(list);
+          if (!selectedPatientId) {
+            setSelectedPatientId(list[0].patientId || list[0].id);
+          }
+        } else {
+          // Fallback fetch
+          const res = await axios.get('/api/patients');
+          if (res.data.success) {
+            setPatients(res.data.data);
+            if (!selectedPatientId && res.data.data.length > 0) {
+              setSelectedPatientId(res.data.data[0].id);
+            }
           }
         }
       } catch (err) {
         console.error("Failed to load patients catalog:", err.message);
         setPatients([
-          { id: "P-1001", fullName: "Aarav Sharma" },
-          { id: "P-1002", fullName: "Priya Patel" }
+          { id: "P-1001", patientId: "P-1001", fullName: "Aarav Sharma" },
+          { id: "P-1002", patientId: "P-1002", fullName: "Priya Patel" }
         ]);
         setSelectedPatientId("P-1001");
       }
@@ -41,11 +56,10 @@ const UploadScan = () => {
     fetchPatients();
   }, [selectedPatientId]);
 
-  const onDrop = useCallback((acceptedFiles) => {
+  const onDrop = useCallback(async (acceptedFiles) => {
     const droppedFile = acceptedFiles[0];
     if (!droppedFile) return;
 
-    // Local file validation
     const maxBytes = 10 * 1024 * 1024; // 10MB
     if (droppedFile.size > maxBytes) {
       toast.error('File size exceeds the 10MB limit.');
@@ -56,21 +70,24 @@ const UploadScan = () => {
       preview: URL.createObjectURL(droppedFile)
     }));
 
-    // Trigger mock progress animation
     setIsUploading(true);
     setUploadProgress(0);
-    const interval = setInterval(() => {
-      setUploadProgress((old) => {
-        if (old >= 100) {
-          clearInterval(interval);
-          setIsUploading(false);
-          toast.success('Scan file uploaded successfully to cache.');
-          return 100;
-        }
-        return old + 20;
+
+    try {
+      // Firebase Storage real upload
+      const uploadRes = await storageService.uploadFile(droppedFile, 'scans', (progress) => {
+        setUploadProgress(progress);
       });
-    }, 150);
-  }, []);
+      setUploadedUrl(uploadRes.downloadURL);
+      toast.success('Scan image uploaded to Firebase Storage!');
+      await firestoreService.logAuditEvent(user?.uid, 'UPLOAD_SCAN', 'scans', uploadRes.fullPath);
+    } catch (e) {
+      console.warn("Firebase Storage upload fallback:", e.message);
+      setUploadedUrl(URL.createObjectURL(droppedFile));
+    } finally {
+      setIsUploading(false);
+    }
+  }, [user]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,

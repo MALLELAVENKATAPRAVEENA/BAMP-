@@ -6,6 +6,9 @@ import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import axios from 'axios';
 
+import { firestoreService } from '../services/firestoreService';
+import { useAuth } from '../context/AuthContext';
+
 const PatientRecords = () => {
   const [patients, setPatients] = useState([]);
   const [search, setSearch] = useState('');
@@ -13,26 +16,35 @@ const PatientRecords = () => {
   const [sortOrder, setSortOrder] = useState('asc');
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   useEffect(() => {
-    fetchPatients();
+    // Real-time Firestore subscription
+    const unsub = firestoreService.subscribeToPatients((list) => {
+      if (list && list.length > 0) {
+        setPatients(list);
+        setIsLoading(false);
+      } else {
+        // Fallback fetch
+        fetchPatients();
+      }
+    });
+
+    return () => unsub();
   }, []);
 
   const fetchPatients = async () => {
     setIsLoading(true);
     try {
-      const res = await axios.get('/api/patients');
-      if (res.data.success) {
-        setPatients(res.data.data);
+      const list = await firestoreService.getPatients();
+      if (list && list.length > 0) {
+        setPatients(list);
+      } else {
+        const res = await axios.get('/api/patients');
+        if (res.data.success) setPatients(res.data.data);
       }
     } catch (err) {
-      console.error("Failed to load patients list, using mock fallbacks:", err.message);
-      // Fallback patient cache
-      setPatients([
-        { id: "P-1001", fullName: "Aarav Sharma", age: 12, gender: "Male", dob: "2014-05-12", skeletalClassification: "Class III", growthPattern: "Hypodivergent", createdAt: new Date(Date.now() - 5*24*60*60*1000).toISOString() },
-        { id: "P-1002", fullName: "Priya Patel", age: 11, gender: "Female", dob: "2015-08-20", skeletalClassification: "Class III", growthPattern: "Normodivergent", createdAt: new Date(Date.now() - 3*24*60*60*1000).toISOString() },
-        { id: "P-1003", fullName: "Rohan Das", age: 13, gender: "Male", dob: "2013-02-14", skeletalClassification: "Class III", growthPattern: "Hyperdivergent", createdAt: new Date(Date.now() - 1*24*60*60*1000).toISOString() }
-      ]);
+      console.error("Failed to load patients list:", err.message);
     } finally {
       setIsLoading(false);
     }
@@ -41,11 +53,9 @@ const PatientRecords = () => {
   const handleDelete = async (id, name) => {
     if (window.confirm(`Are you sure you want to permanently delete patient ${name} (${id})?`)) {
       try {
-        const res = await axios.delete(`/api/patients/${id}`);
-        if (res.data.success) {
-          toast.success(`Patient record deleted successfully.`);
-          fetchPatients();
-        }
+        await firestoreService.deletePatient(id);
+        await firestoreService.logAuditEvent(user?.uid, 'DELETE_PATIENT', 'patients', id);
+        toast.success(`Patient record deleted from Cloud Firestore.`);
       } catch (err) {
         toast.error('Failed to delete patient record.');
       }

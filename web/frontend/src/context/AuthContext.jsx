@@ -1,102 +1,208 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import axios from 'axios';
-import { auth, googleProvider, isFirebaseConfigured } from '../firebase/config';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, signOut } from 'firebase/auth';
+import { 
+  auth, 
+  googleProvider, 
+  isFirebaseConfigured 
+} from '../firebase/config';
+import { 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, 
+  signInWithPopup, 
+  signOut, 
+  sendPasswordResetEmail, 
+  sendEmailVerification, 
+  onAuthStateChanged 
+} from 'firebase/auth';
+import { firestoreService } from '../services/firestoreService';
 
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
+  const [firebaseUser, setFirebaseUser] = useState(null);
   const [token, setToken] = useState(() => localStorage.getItem('bamp-token') || null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [demoMode, setDemoMode] = useState(true);
 
+  // Monitor Firebase Auth State
   useEffect(() => {
-    const initAuth = async () => {
-      if (token) {
-        try {
-          // Set axios default auth header
-          axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-          
-          // Verify token/fetch settings
-          const res = await axios.get('/api/settings');
-          if (res.data.success) {
-            setUser({
-              name: res.data.data.doctorName || 'Dr. Venkatapraveenamallela',
-              email: res.data.data.email || 'dr.venkat@hospital.org',
-              role: 'Orthodontist',
-              hospital: res.data.data.hospitalName
-            });
-            setIsAuthenticated(true);
-          } else {
-            handleLogout();
-          }
-        } catch (err) {
-          console.error("Token verification failed:", err.message);
-          
-          // If server fails or offline, check if token is demo-token and load default
-          if (token.startsWith('demo-')) {
-            setUser({
-              name: 'Dr. Venkatapraveenamallela',
-              email: 'dr.venkat@hospital.org',
-              role: 'Orthodontist',
-              hospital: 'Advanced Orthodontic Care & AI Research Center'
-            });
-            setIsAuthenticated(true);
-          } else {
-            handleLogout();
-          }
+    if (!auth) {
+      setLoading(false);
+      return;
+    }
+
+    const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
+      if (fbUser) {
+        setFirebaseUser(fbUser);
+        const idToken = await fbUser.getIdToken();
+        localStorage.setItem('bamp-token', idToken);
+        setToken(idToken);
+
+        // Fetch or create profile from Firestore users/{uid}
+        let profile = await firestoreService.getUserProfile(fbUser.uid);
+        if (!profile) {
+          profile = await firestoreService.createUserProfile(fbUser.uid, {
+            name: fbUser.displayName || 'Dr. Orthodontist',
+            email: fbUser.email,
+            role: 'Orthodontist',
+            photoURL: fbUser.photoURL || ''
+          });
+        }
+
+        setUser({
+          uid: fbUser.uid,
+          name: profile?.name || fbUser.displayName || 'Dr. Orthodontist',
+          email: fbUser.email,
+          role: profile?.role || 'Orthodontist',
+          emailVerified: fbUser.emailVerified,
+          photoURL: fbUser.photoURL || ''
+        });
+        setIsAuthenticated(true);
+        axios.defaults.headers.common['Authorization'] = `Bearer ${idToken}`;
+      } else {
+        // Fallback check if local demo token exists
+        const localToken = localStorage.getItem('bamp-token');
+        if (localToken && localToken.startsWith('demo-')) {
+          setUser({
+            uid: 'demo-doctor-uid',
+            name: 'Dr. Venkatapraveenamallela',
+            email: 'dr.venkat@hospital.org',
+            role: 'Orthodontist',
+            emailVerified: true
+          });
+          setIsAuthenticated(true);
+        } else if (!fbUser) {
+          setUser(null);
+          setFirebaseUser(null);
+          setIsAuthenticated(false);
         }
       }
       setLoading(false);
-    };
+    });
 
-    initAuth();
-  }, [token]);
+    return () => unsubscribe();
+  }, []);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    if (user?.uid) {
+      await firestoreService.logAuditEvent(user.uid, 'USER_LOGOUT', 'users', user.uid);
+    }
+
     setUser(null);
+    setFirebaseUser(null);
     setToken(null);
     setIsAuthenticated(false);
     localStorage.removeItem('bamp-token');
     delete axios.defaults.headers.common['Authorization'];
-    
-    if (isFirebaseConfigured && auth) {
-      signOut(auth).catch(err => console.error("Firebase Signout Error:", err));
+
+    if (auth) {
+      await signOut(auth).catch(err => console.warn("Firebase Signout warning:", err.message));
     }
   };
 
-  // 1. Initial Email/Password Authentication (Triggers OTP verification page)
-  const login = async (emailAddress, password) => {
-    try {
-      const res = await axios.post('/api/auth/login', { emailAddress, password });
-      return res.data; // contains OTP code and success message
-    } catch (err) {
-      throw new Error(err.response?.data?.message || 'Login request failed.');
-    }
-  };
+  // 1. Signup with Email/Password
+  const signup = async (fullName, emailAddress, password, role = 'Orthodontist') => {
+    if (auth) {
+      try {
+        const userCred = await createUserWithEmailAndPassword(auth, emailAddress, password);
+        const fbUser = userCred.user;
+        
+        // Send email verification link
+        await sendEmailVerification(fbUser).catch(e => console.warn("Email verification send warning:", e.message));
 
-  const signup = async (fullName, emailAddress, password) => {
+        // Create Firestore user document users/{uid}
+        await firestoreService.createUserProfile(fbUser.uid, {
+          name: fullName,
+          email: emailAddress,
+          role: role,
+          photoURL: ''
+        });
+
+        await firestoreService.logAuditEvent(fbUser.uid, 'USER_SIGNUP', 'users', fbUser.uid, { email: emailAddress });
+
+        const idToken = await fbUser.getIdToken();
+        localStorage.setItem('bamp-token', idToken);
+        setToken(idToken);
+        setUser({
+          uid: fbUser.uid,
+          name: fullName,
+          email: emailAddress,
+          role: role,
+          emailVerified: fbUser.emailVerified
+        });
+        setIsAuthenticated(true);
+
+        return {
+          success: true,
+          message: 'Account registered successfully. Verification email sent.',
+          user: fbUser
+        };
+      } catch (err) {
+        console.warn("Firebase Auth Signup fallback to backend API:", err.message);
+      }
+    }
+
+    // Backend endpoint fallback
     try {
       const res = await axios.post('/api/auth/signup', { fullName, emailAddress, password });
-      return res.data; // contains OTP and success message
+      return res.data;
     } catch (err) {
       throw new Error(err.response?.data?.message || 'Registration failed.');
     }
   };
 
-  // 2. OTP Verification (Verifies identity and registers token/session)
+  // 2. Login with Email/Password
+  const login = async (emailAddress, password) => {
+    if (auth) {
+      try {
+        const userCred = await signInWithEmailAndPassword(auth, emailAddress, password);
+        const fbUser = userCred.user;
+
+        const idToken = await fbUser.getIdToken();
+        localStorage.setItem('bamp-token', idToken);
+        setToken(idToken);
+
+        const profile = await firestoreService.getUserProfile(fbUser.uid);
+        
+        await firestoreService.logAuditEvent(fbUser.uid, 'USER_LOGIN', 'users', fbUser.uid);
+
+        setUser({
+          uid: fbUser.uid,
+          name: profile?.name || 'Dr. Orthodontist',
+          email: fbUser.email,
+          role: profile?.role || 'Orthodontist',
+          emailVerified: fbUser.emailVerified
+        });
+        setIsAuthenticated(true);
+
+        return {
+          success: true,
+          message: 'Logged in successfully.',
+          user: fbUser
+        };
+      } catch (err) {
+        console.warn("Firebase Auth Login fallback to backend API:", err.message);
+      }
+    }
+
+    try {
+      const res = await axios.post('/api/auth/login', { emailAddress, password });
+      return res.data;
+    } catch (err) {
+      throw new Error(err.response?.data?.message || 'Login request failed.');
+    }
+  };
+
+  // 3. OTP Verification
   const verifyOtp = async (emailAddress, otp) => {
     try {
       const res = await axios.post('/api/auth/verify-otp', { emailAddress, otp });
       if (res.data.success) {
         const sessionToken = res.data.token;
-        const userData = res.data.user;
-        
         localStorage.setItem('bamp-token', sessionToken);
         setToken(sessionToken);
-        setUser(userData);
+        setUser(res.data.user);
         setIsAuthenticated(true);
         axios.defaults.headers.common['Authorization'] = `Bearer ${sessionToken}`;
         return true;
@@ -107,27 +213,44 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // 3. Google OAuth Login
+  // 4. Password Reset
+  const sendResetPassword = async (email) => {
+    if (auth) {
+      await sendPasswordResetEmail(auth, email);
+      return true;
+    }
+    return true;
+  };
+
+  // 5. Google Login
   const loginWithGoogle = async () => {
     try {
-      if (isFirebaseConfigured && auth && googleProvider) {
+      if (auth && googleProvider) {
         const result = await signInWithPopup(auth, googleProvider);
-        const idToken = await result.user.getIdToken();
-        
-        // Pass firebase token to our backend
-        const res = await axios.post('/api/auth/google-login', { token: idToken });
-        if (res.data.success) {
-          const sessionToken = res.data.token;
-          localStorage.setItem('bamp-token', sessionToken);
-          setToken(sessionToken);
-          setUser(res.data.user);
-          setIsAuthenticated(true);
-          axios.defaults.headers.common['Authorization'] = `Bearer ${sessionToken}`;
-          return true;
-        }
+        const fbUser = result.user;
+        const idToken = await fbUser.getIdToken();
+
+        await firestoreService.createUserProfile(fbUser.uid, {
+          name: fbUser.displayName || 'Google User',
+          email: fbUser.email,
+          role: 'Orthodontist',
+          photoURL: fbUser.photoURL || ''
+        });
+
+        await firestoreService.logAuditEvent(fbUser.uid, 'GOOGLE_LOGIN', 'users', fbUser.uid);
+
+        localStorage.setItem('bamp-token', idToken);
+        setToken(idToken);
+        setUser({
+          uid: fbUser.uid,
+          name: fbUser.displayName || 'Google User',
+          email: fbUser.email,
+          role: 'Orthodontist',
+          photoURL: fbUser.photoURL || ''
+        });
+        setIsAuthenticated(true);
+        return true;
       } else {
-        // Mock Google sign-in fallback
-        console.log("Using Mock Google Auth Sign-in");
         const mockToken = `demo-google-${Date.now()}`;
         const res = await axios.post('/api/auth/google-login', { token: mockToken });
         if (res.data.success) {
@@ -136,7 +259,6 @@ export const AuthProvider = ({ children }) => {
           setToken(sessionToken);
           setUser(res.data.user);
           setIsAuthenticated(true);
-          axios.defaults.headers.common['Authorization'] = `Bearer ${sessionToken}`;
           return true;
         }
       }
@@ -149,12 +271,14 @@ export const AuthProvider = ({ children }) => {
   return (
     <AuthContext.Provider value={{
       user,
+      firebaseUser,
       token,
       isAuthenticated,
       loading,
       login,
       signup,
       verifyOtp,
+      sendResetPassword,
       loginWithGoogle,
       logout: handleLogout
     }}>

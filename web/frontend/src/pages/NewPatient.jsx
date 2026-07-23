@@ -7,15 +7,20 @@ import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import axios from 'axios';
 
+import { firestoreService } from '../services/firestoreService';
+import { useAuth } from '../context/AuthContext';
+
 const NewPatient = () => {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const { user } = useAuth();
   
   // Auto-generate a unique Patient ID
   const defaultPatientId = `P-${Math.floor(1000 + Math.random() * 9000)}`;
 
   const { register, handleSubmit, formState: { errors }, reset } = useForm({
     defaultValues: {
+      patientId: defaultPatientId,
       id: defaultPatientId,
       fullName: '',
       age: '',
@@ -38,15 +43,21 @@ const NewPatient = () => {
   const onSubmit = async (data) => {
     setIsLoading(true);
     try {
-      const res = await axios.post('/api/patients', data);
-      if (res.data.success) {
-        toast.success(`Patient ${data.fullName} registered successfully!`);
-        setTimeout(() => {
-          navigate('/patient-records');
-        }, 1200);
-      }
+      // 1. Write to Cloud Firestore patients collection
+      const created = await firestoreService.createPatient(data, user?.uid || 'doctor_1');
+      
+      // 2. Write to audit logs collection
+      await firestoreService.logAuditEvent(user?.uid, 'CREATE_PATIENT', 'patients', created.patientId || created.id, { patientName: data.fullName });
+      
+      // 3. Optional backend call
+      await axios.post('/api/patients', data).catch(() => {});
+
+      toast.success(`Patient ${data.fullName} registered in Cloud Firestore!`);
+      setTimeout(() => {
+        navigate('/patient-records');
+      }, 1200);
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to register patient.');
+      toast.error(err.message || 'Failed to register patient.');
     } finally {
       setIsLoading(false);
     }

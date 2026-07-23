@@ -12,6 +12,15 @@ function generateOtp() {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
+// Helper to validate password rules (min 6 chars, uppercase, number, special char)
+function validatePassword(password) {
+  if (!password || password.length < 6) return 'Password must be at least 6 characters.';
+  if (!/[A-Z]/.test(password)) return 'Password must contain at least one uppercase letter (A-Z).';
+  if (!/[0-9]/.test(password)) return 'Password must contain at least one number (0-9).';
+  if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) return 'Password must contain at least one special character (!@#$%^&* etc.).';
+  return null;
+}
+
 const authController = {
   signup: async (req, res, next) => {
     try {
@@ -19,6 +28,11 @@ const authController = {
 
       if (!fullName || !emailAddress || !password) {
         return res.status(400).json({ success: false, message: 'Please provide name, email, and password.' });
+      }
+
+      const passError = validatePassword(password);
+      if (passError) {
+        return res.status(400).json({ success: false, message: passError });
       }
 
       const otp = generateOtp();

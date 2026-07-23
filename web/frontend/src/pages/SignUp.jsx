@@ -7,6 +7,14 @@ import { useAuth } from '../context/AuthContext';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
+const validatePasswordRules = (value) => {
+  if (!value || value.length < 6) return 'Password must be at least 6 characters long';
+  if (!/[A-Z]/.test(value)) return 'Password must include at least 1 uppercase letter (A-Z)';
+  if (!/[0-9]/.test(value)) return 'Password must include at least 1 number (0-9)';
+  if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(value)) return 'Password must include at least 1 special character (!@#$%^&* etc.)';
+  return true;
+};
+
 const SignUp = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -22,6 +30,12 @@ const SignUp = () => {
     }
   });
 
+  const watchPassword = watch('password', '');
+  const checkLength = watchPassword.length >= 6;
+  const checkUpper = /[A-Z]/.test(watchPassword);
+  const checkNumber = /[0-9]/.test(watchPassword);
+  const checkSpecial = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(watchPassword);
+
   const onSubmit = async (data) => {
     if (data.password !== data.confirmPassword) {
       toast.error("Passwords do not match.");
@@ -33,7 +47,7 @@ const SignUp = () => {
       const response = await signup(data.fullName, data.emailAddress, data.password);
       toast.success(response.message || 'OTP verification code dispatched.');
       setTimeout(() => {
-        navigate('/otp-verify', { state: { email: data.emailAddress } });
+        navigate('/otp-verify', { state: { email: data.emailAddress, demoOtp: response.demoOtp } });
       }, 1200);
     } catch (err) {
       toast.error(err.message || 'Registration failed.');
@@ -119,7 +133,7 @@ const SignUp = () => {
                   placeholder="••••••••"
                   {...register('password', {
                     required: 'Password is required',
-                    minLength: { value: 6, message: 'Password must be at least 6 characters' }
+                    validate: validatePasswordRules
                   })}
                   className="w-full pl-12 pr-12 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-medical-500/20 focus:border-medical-500 transition-all font-medium"
                 />
@@ -132,6 +146,25 @@ const SignUp = () => {
                 </button>
               </div>
               {errors.password && <p className="text-xs text-rose-500 font-semibold">{errors.password.message}</p>}
+
+              {/* Real-time Password Checklist */}
+              <div className="mt-2 p-2.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-800 text-[11px] space-y-1">
+                <p className="font-semibold text-slate-500 uppercase tracking-wider text-[10px]">Password Requirements:</p>
+                <div className="grid grid-cols-2 gap-1">
+                  <span className={`flex items-center gap-1 font-medium ${checkLength ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`}>
+                    {checkLength ? '✓' : '○'} Min 6 Chars
+                  </span>
+                  <span className={`flex items-center gap-1 font-medium ${checkUpper ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`}>
+                    {checkUpper ? '✓' : '○'} Uppercase (A-Z)
+                  </span>
+                  <span className={`flex items-center gap-1 font-medium ${checkNumber ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`}>
+                    {checkNumber ? '✓' : '○'} Number (0-9)
+                  </span>
+                  <span className={`flex items-center gap-1 font-medium ${checkSpecial ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`}>
+                    {checkSpecial ? '✓' : '○'} Special (!@#$)
+                  </span>
+                </div>
+              </div>
             </div>
 
             {/* Confirm Password */}

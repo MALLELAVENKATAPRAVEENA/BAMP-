@@ -5,20 +5,27 @@ import { Mail, ArrowLeft, Send } from 'lucide-react';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
+import { useAuth } from '../context/AuthContext';
+
 const ForgotPassword = () => {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const { sendResetPassword } = useAuth();
   const { register, handleSubmit, formState: { errors } } = useForm();
 
-  const onSubmit = (data) => {
+  const onSubmit = async (data) => {
     setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
+      await sendResetPassword(data.emailAddress);
       toast.success(`Password reset verification email dispatched to: ${data.emailAddress}`);
       setTimeout(() => {
         navigate('/reset-password', { state: { email: data.emailAddress } });
       }, 1500);
-    }, 1200);
+    } catch (err) {
+      toast.error(err.message || 'Failed to send reset email.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
