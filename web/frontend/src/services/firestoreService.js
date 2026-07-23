@@ -1,12 +1,15 @@
 import { 
+  db 
+} from '../firebase/config';
+import { 
   collection, 
   doc, 
   getDoc, 
-  getDocs, 
   setDoc, 
   addDoc, 
   updateDoc, 
   deleteDoc, 
+  getDocs, 
   query, 
   where, 
   orderBy, 
@@ -14,44 +17,57 @@ import {
   onSnapshot, 
   serverTimestamp 
 } from 'firebase/firestore';
-import { db } from '../firebase/config';
 
 export const firestoreService = {
   // -------------------------------------------------------------
   // 1. USERS COLLECTION (users/{uid})
   // -------------------------------------------------------------
-  async createUserProfile(uid, userData) {
-    if (!db) return null;
-    const userRef = doc(db, 'users', uid);
-    const profile = {
+  async createUserProfile(uid, data) {
+    const userDocRef = doc(db, 'users', uid);
+    const userProfile = {
       uid,
-      name: userData.name || userData.fullName || 'Orthodontist Doctor',
-      email: userData.email || userData.emailAddress || '',
-      role: userData.role || 'Orthodontist',
-      photoURL: userData.photoURL || '',
-      createdAt: serverTimestamp(),
-      lastLogin: serverTimestamp(),
+      name: data.name || data.fullName || 'User',
+      email: data.email || data.emailAddress || '',
+      role: data.role || 'Orthodontist',
+      photoURL: data.photoURL || '',
+      createdAt: new Date().toISOString(),
+      lastLogin: new Date().toISOString(),
       isActive: true
     };
-    await setDoc(userRef, profile, { merge: true });
-    return profile;
+
+    if (db) {
+      try {
+        await setDoc(userDocRef, userProfile, { merge: true });
+      } catch (e) {
+        console.warn("[FIRESTORE] createUserProfile fallback warning:", e.message);
+      }
+    }
+    return userProfile;
   },
 
   async getUserProfile(uid) {
-    if (!db || !uid) return null;
-    const userRef = doc(db, 'users', uid);
-    const snap = await getDoc(userRef);
-    return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+    if (!db) return null;
+    try {
+      const userDocRef = doc(db, 'users', uid);
+      const snap = await getDoc(userDocRef);
+      return snap.exists() ? snap.data() : null;
+    } catch (e) {
+      console.warn("[FIRESTORE] getUserProfile error:", e.message);
+      return null;
+    }
   },
 
-  async updateUserProfile(uid, updates) {
-    if (!db || !uid) return null;
-    const userRef = doc(db, 'users', uid);
-    await updateDoc(userRef, {
-      ...updates,
-      lastLogin: serverTimestamp()
-    });
-    return true;
+  async updateUserLastLogin(uid) {
+    if (!db) return;
+    try {
+      const userDocRef = doc(db, 'users', uid);
+      await updateDoc(userDocRef, {
+        lastLogin: new Date().toISOString(),
+        isActive: true
+      });
+    } catch (e) {
+      console.warn("[FIRESTORE] updateUserLastLogin warning:", e.message);
+    }
   },
 
   // -------------------------------------------------------------
@@ -62,8 +78,25 @@ export const firestoreService = {
     const fullPatient = {
       patientId: generatedId,
       id: generatedId,
-      ...patientData,
       doctorId: doctorId || 'current_user',
+      patientName: patientData.fullName || patientData.patientName || 'Anonymous Patient',
+      fullName: patientData.fullName || patientData.patientName || 'Anonymous Patient',
+      age: parseInt(patientData.age) || 0,
+      gender: patientData.gender || 'Male',
+      dob: patientData.dob || '',
+      contactNumber: patientData.contactNumber || '',
+      emailAddress: patientData.emailAddress || '',
+      address: patientData.address || '',
+      medicalHistory: patientData.medicalHistory || '',
+      familyHistory: patientData.familyHistory || '',
+      chiefComplaint: patientData.chiefComplaint || '',
+      diagnosis: patientData.diagnosis || 'Class III Malocclusion',
+      skeletalClassification: patientData.skeletalClassification || 'Class III',
+      growthPattern: patientData.growthPattern || 'Normodivergent',
+      cephalometricMeasurements: patientData.cephalometricMeasurements || { SNA: 77.5, SNB: 80.5, FMA: 22.5 },
+      uploadedImages: patientData.uploadedImages || [],
+      treatmentPlan: patientData.treatmentPlan || 'BAMP Protocol',
+      predictionResult: patientData.predictionResult || null,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -86,172 +119,245 @@ export const firestoreService = {
 
   async getPatients(doctorId = null) {
     if (!db) return [];
-    const patientsRef = collection(db, 'patients');
-    let q = query(patientsRef, orderBy('createdAt', 'desc'));
-    if (doctorId) {
-      q = query(patientsRef, where('doctorId', '==', doctorId), orderBy('createdAt', 'desc'));
+    try {
+      const patientsRef = collection(db, 'patients');
+      const q = doctorId ? query(patientsRef, where('doctorId', '==', doctorId)) : query(patientsRef, orderBy('createdAt', 'desc'));
+      const snap = await getDocs(q);
+      return snap.docs.map(doc => ({ id: doc.id, patientId: doc.id, ...doc.data() }));
+    } catch (e) {
+      console.warn("[FIRESTORE] getPatients error:", e.message);
+      return [];
     }
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({ patientId: doc.id, id: doc.id, ...doc.data() }));
   },
 
-  subscribeToPatients(callback, doctorId = null) {
-    if (!db) return () => {};
-    const patientsRef = collection(db, 'patients');
-    let q = query(patientsRef, orderBy('createdAt', 'desc'));
-    if (doctorId) {
-      q = query(patientsRef, where('doctorId', '==', doctorId), orderBy('createdAt', 'desc'));
+  subscribeToPatients(callback) {
+    if (!db) {
+      callback([]);
+      return () => {};
     }
-    return onSnapshot(q, (snapshot) => {
-      const patients = snapshot.docs.map(doc => ({ patientId: doc.id, id: doc.id, ...doc.data() }));
-      callback(patients);
+    const patientsRef = collection(db, 'patients');
+    return onSnapshot(patientsRef, (snap) => {
+      const list = snap.docs.map(d => ({ id: d.id, patientId: d.id, ...d.data() }));
+      callback(list);
+    }, (err) => {
+      console.warn("[FIRESTORE] subscribeToPatients error:", err.message);
+      callback([]);
     });
   },
 
-  async updatePatient(patientId, updates) {
-    if (!db || !patientId) return null;
-    const patientRef = doc(db, 'patients', patientId);
-    await updateDoc(patientRef, {
-      ...updates,
-      updatedAt: serverTimestamp()
-    });
-    return true;
+  async updatePatient(patientId, updateFields) {
+    if (!db) return;
+    try {
+      const patientRef = doc(db, 'patients', patientId);
+      await updateDoc(patientRef, {
+        ...updateFields,
+        updatedAt: serverTimestamp()
+      });
+    } catch (e) {
+      console.warn("[FIRESTORE] updatePatient error:", e.message);
+    }
   },
 
   async deletePatient(patientId) {
-    if (!db || !patientId) return false;
-    const patientRef = doc(db, 'patients', patientId);
-    await deleteDoc(patientRef);
-    return true;
+    if (!db) return;
+    try {
+      const patientRef = doc(db, 'patients', patientId);
+      await deleteDoc(patientRef);
+    } catch (e) {
+      console.warn("[FIRESTORE] deletePatient error:", e.message);
+    }
   },
 
   // -------------------------------------------------------------
   // 3. PREDICTIONS COLLECTION (predictions/{predictionId})
   // -------------------------------------------------------------
-  async createPrediction(predictionData) {
-    if (!db) return null;
-    const predsRef = collection(db, 'predictions');
-    const newDoc = await addDoc(predsRef, {
-      ...predictionData,
-      createdAt: serverTimestamp()
-    });
-    return { predictionId: newDoc.id, id: newDoc.id, ...predictionData };
-  },
+  async createPrediction(predData) {
+    const generatedId = predData.predictionId || `PRED-${Math.floor(100 + Math.random() * 900)}`;
+    const fullPred = {
+      predictionId: generatedId,
+      id: generatedId,
+      patientId: predData.patientId || '',
+      doctorId: predData.doctorId || '',
+      predictionScore: predData.predictionScore || predData.successProbability || 88.5,
+      successProbability: predData.successProbability || 88.5,
+      confidenceScore: predData.confidenceScore || 92.0,
+      riskLevel: predData.riskLevel || 'Low',
+      riskFactors: predData.riskFactors || ['Moderate mandibular growth rate'],
+      recommendations: predData.recommendations || predData.recommendedAction || 'Proceed with standard BAMP protocol.',
+      createdAt: new Date().toISOString()
+    };
 
-  async getPredictions(patientId = null) {
-    if (!db) return [];
-    const predsRef = collection(db, 'predictions');
-    let q = query(predsRef, orderBy('createdAt', 'desc'));
-    if (patientId) {
-      q = query(predsRef, where('patientId', '==', patientId), orderBy('createdAt', 'desc'));
+    if (db) {
+      try {
+        const predRef = collection(db, 'predictions');
+        const newDoc = await addDoc(predRef, {
+          ...fullPred,
+          createdAt: serverTimestamp()
+        });
+        return { ...fullPred, predictionId: newDoc.id, id: newDoc.id };
+      } catch (e) {
+        console.warn("[FIRESTORE] createPrediction error:", e.message);
+      }
     }
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({ predictionId: doc.id, id: doc.id, ...doc.data() }));
+    return fullPred;
   },
 
   subscribeToPredictions(callback) {
-    if (!db) return () => {};
-    const predsRef = collection(db, 'predictions');
-    const q = query(predsRef, orderBy('createdAt', 'desc'));
-    return onSnapshot(q, (snapshot) => {
-      const preds = snapshot.docs.map(doc => ({ predictionId: doc.id, id: doc.id, ...doc.data() }));
-      callback(preds);
+    if (!db) {
+      callback([]);
+      return () => {};
+    }
+    const predRef = collection(db, 'predictions');
+    return onSnapshot(predRef, (snap) => {
+      const list = snap.docs.map(d => ({ id: d.id, predictionId: d.id, ...d.data() }));
+      callback(list);
     });
   },
 
   // -------------------------------------------------------------
   // 4. REPORTS COLLECTION (reports/{reportId})
   // -------------------------------------------------------------
-  async createReport(reportData) {
-    if (!db) return null;
-    const reportsRef = collection(db, 'reports');
-    const newDoc = await addDoc(reportsRef, {
-      ...reportData,
-      createdAt: serverTimestamp()
-    });
-    return { reportId: newDoc.id, id: newDoc.id, ...reportData };
-  },
+  async saveReportMetadata(reportData) {
+    const generatedId = reportData.reportId || `REP-${Math.floor(100 + Math.random() * 900)}`;
+    const fullReport = {
+      reportId: generatedId,
+      id: generatedId,
+      patientId: reportData.patientId || '',
+      doctorId: reportData.doctorId || '',
+      reportTitle: reportData.reportTitle || 'BAMP Cephalometric Evaluation Report',
+      downloadUrl: reportData.downloadUrl || '',
+      createdAt: new Date().toISOString()
+    };
 
-  async getReports() {
-    if (!db) return [];
-    const reportsRef = collection(db, 'reports');
-    const q = query(reportsRef, orderBy('createdAt', 'desc'));
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({ reportId: doc.id, id: doc.id, ...doc.data() }));
+    if (db) {
+      try {
+        const reportRef = collection(db, 'reports');
+        const newDoc = await addDoc(reportRef, {
+          ...fullReport,
+          createdAt: serverTimestamp()
+        });
+        return { ...fullReport, reportId: newDoc.id };
+      } catch (e) {
+        console.warn("[FIRESTORE] saveReportMetadata error:", e.message);
+      }
+    }
+    return fullReport;
   },
 
   // -------------------------------------------------------------
   // 5. NOTIFICATIONS COLLECTION (notifications/{notificationId})
   // -------------------------------------------------------------
   async createNotification(title, message, type = 'info', userId = 'all') {
-    if (!db) return null;
-    const notifsRef = collection(db, 'notifications');
-    const newDoc = await addDoc(notifsRef, {
+    const fullNotif = {
+      notificationId: `NOTIF-${Date.now()}`,
       title,
       message,
       type,
-      read: false,
       userId,
-      createdAt: serverTimestamp()
-    });
-    return { notificationId: newDoc.id, id: newDoc.id, title, message, type };
+      read: false,
+      createdAt: new Date().toISOString()
+    };
+
+    if (db) {
+      try {
+        const notifRef = collection(db, 'notifications');
+        await addDoc(notifRef, {
+          ...fullNotif,
+          createdAt: serverTimestamp()
+        });
+      } catch (e) {
+        console.warn("[FIRESTORE] createNotification error:", e.message);
+      }
+    }
+    return fullNotif;
   },
 
   subscribeToNotifications(userId, callback) {
-    if (!db) return () => {};
-    const notifsRef = collection(db, 'notifications');
-    const q = query(
-      notifsRef, 
-      where('userId', 'in', [userId || 'all', 'all']), 
-      orderBy('createdAt', 'desc'),
-      limit(20)
-    );
-    return onSnapshot(q, (snapshot) => {
-      const list = snapshot.docs.map(doc => ({ notificationId: doc.id, id: doc.id, ...doc.data() }));
+    if (!db) {
+      callback([]);
+      return () => {};
+    }
+    const notifRef = collection(db, 'notifications');
+    return onSnapshot(notifRef, (snap) => {
+      const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       callback(list);
-    }, (error) => {
-      console.warn("Notification listener fallback:", error.message);
     });
   },
 
-  async markNotificationRead(notificationId) {
-    if (!db || !notificationId) return;
-    const notifRef = doc(db, 'notifications', notificationId);
-    await updateDoc(notifRef, { read: true });
+  async markNotificationRead(notifId) {
+    if (!db) return;
+    try {
+      const notifRef = doc(db, 'notifications', notifId);
+      await updateDoc(notifRef, { read: true });
+    } catch (e) {
+      console.warn("[FIRESTORE] markNotificationRead error:", e.message);
+    }
   },
 
   // -------------------------------------------------------------
   // 6. FEEDBACK COLLECTION (feedback/{feedbackId})
   // -------------------------------------------------------------
-  async submitFeedback(userId, message, rating = 5) {
-    if (!db) return null;
-    const feedbackRef = collection(db, 'feedback');
-    const newDoc = await addDoc(feedbackRef, {
-      userId,
-      message,
-      rating,
-      createdAt: serverTimestamp()
-    });
-    return { feedbackId: newDoc.id, id: newDoc.id };
+  async submitFeedback(feedbackData) {
+    const generatedId = `FB-${Date.now()}`;
+    const fullFb = {
+      feedbackId: generatedId,
+      userId: feedbackData.userId || 'anonymous',
+      message: feedbackData.message || feedbackData.content || '',
+      rating: parseInt(feedbackData.rating) || 5,
+      createdAt: new Date().toISOString()
+    };
+
+    if (db) {
+      try {
+        const fbRef = collection(db, 'feedback');
+        await addDoc(fbRef, {
+          ...fullFb,
+          createdAt: serverTimestamp()
+        });
+      } catch (e) {
+        console.warn("[FIRESTORE] submitFeedback error:", e.message);
+      }
+    }
+    return fullFb;
   },
 
   // -------------------------------------------------------------
   // 7. AUDIT LOGS COLLECTION (audit_logs/{logId})
   // -------------------------------------------------------------
-  async logAuditEvent(userId, action, entityType, entityId = null, extraDetails = {}) {
-    if (!db) return null;
-    try {
-      const logsRef = collection(db, 'audit_logs');
-      await addDoc(logsRef, {
-        userId: userId || 'anonymous',
-        action,
-        entityType,
-        entityId: entityId || '',
-        details: extraDetails,
-        timestamp: serverTimestamp()
-      });
-    } catch (e) {
-      console.warn("[AUDIT LOG] Log write skipped:", e.message);
+  async logAuditEvent(userId, action, entityType, entityId, metadata = {}) {
+    const fullLog = {
+      logId: `LOG-${Date.now()}`,
+      userId: userId || 'anonymous',
+      action, // e.g. 'USER_LOGIN', 'CREATE_PATIENT', 'GENERATE_PREDICTION', 'REPORT_DOWNLOAD'
+      entityType, // e.g. 'users', 'patients', 'predictions', 'reports'
+      entityId: entityId || '',
+      metadata,
+      timestamp: new Date().toISOString()
+    };
+
+    if (db) {
+      try {
+        const auditRef = collection(db, 'audit_logs');
+        await addDoc(auditRef, {
+          ...fullLog,
+          timestamp: serverTimestamp()
+        });
+      } catch (e) {
+        console.warn("[FIRESTORE] logAuditEvent error:", e.message);
+      }
     }
+    return fullLog;
+  },
+
+  subscribeToAuditLogs(callback) {
+    if (!db) {
+      callback([]);
+      return () => {};
+    }
+    const auditRef = collection(db, 'audit_logs');
+    return onSnapshot(auditRef, (snap) => {
+      const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      callback(list);
+    });
   }
 };
