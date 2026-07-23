@@ -70,6 +70,49 @@ export const firestoreService = {
     }
   },
 
+  async updateUserProfile(uid, updateFields) {
+    const userDocRef = doc(db, 'users', uid);
+    const updatedData = {
+      ...updateFields,
+      updatedAt: new Date().toISOString()
+    };
+    if (db) {
+      try {
+        await setDoc(userDocRef, updatedData, { merge: true });
+      } catch (e) {
+        console.warn("[FIRESTORE] updateUserProfile fallback error:", e.message);
+      }
+    }
+    return updatedData;
+  },
+
+  async getAllUsers() {
+    if (!db) return [];
+    try {
+      const usersRef = collection(db, 'users');
+      const snap = await getDocs(usersRef);
+      return snap.docs.map(doc => ({ uid: doc.id, ...doc.data() }));
+    } catch (e) {
+      console.warn("[FIRESTORE] getAllUsers error:", e.message);
+      return [];
+    }
+  },
+
+  subscribeToUsers(callback) {
+    if (!db) {
+      callback([]);
+      return () => {};
+    }
+    const usersRef = collection(db, 'users');
+    return onSnapshot(usersRef, (snap) => {
+      const list = snap.docs.map(d => ({ uid: d.id, ...d.data() }));
+      callback(list);
+    }, (err) => {
+      console.warn("[FIRESTORE] subscribeToUsers error:", err.message);
+      callback([]);
+    });
+  },
+
   // -------------------------------------------------------------
   // 2. PATIENTS COLLECTION (patients/{patientId})
   // -------------------------------------------------------------

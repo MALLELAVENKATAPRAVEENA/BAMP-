@@ -268,6 +268,19 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // 6. Update Profile
+  const updateUserProfile = async (profileData) => {
+    const currentUid = user?.uid || firebaseUser?.uid || 'demo-doctor-uid';
+    const updated = await firestoreService.updateUserProfile(currentUid, profileData);
+    setUser(prev => ({
+      ...(prev || {}),
+      uid: currentUid,
+      ...profileData
+    }));
+    await firestoreService.logAuditEvent(currentUid, 'UPDATE_PROFILE', 'users', currentUid, profileData);
+    return updated;
+  };
+
   return (
     <AuthContext.Provider value={{
       user,
@@ -280,6 +293,7 @@ export const AuthProvider = ({ children }) => {
       verifyOtp,
       sendResetPassword,
       loginWithGoogle,
+      updateUserProfile,
       logout: handleLogout
     }}>
       {children}
