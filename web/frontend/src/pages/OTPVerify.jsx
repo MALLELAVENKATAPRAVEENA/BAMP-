@@ -108,25 +108,6 @@ const OTPVerify = () => {
           </p>
           <p className="text-sm font-semibold text-medical-600 dark:text-medical-400 mt-1">{emailAddress}</p>
 
-          {demoOtp && (
-            <div className="mt-4 p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/50 rounded-2xl text-left text-xs text-amber-800 dark:text-amber-300">
-              <div className="flex items-center justify-between">
-                <div>
-                  <span className="font-bold uppercase tracking-wider block text-[10px] text-amber-600 dark:text-amber-400">Demo Verification OTP</span>
-                  <span className="font-mono text-base font-extrabold text-amber-900 dark:text-amber-200">{demoOtp}</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleAutoFill}
-                  className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-xl text-xs transition-colors"
-                >
-                  Auto-fill Code
-                </button>
-              </div>
-              <p className="mt-1 text-[11px] opacity-80">* Set SMTP credentials in backend/.env to dispatch real emails.</p>
-            </div>
-          )}
-
           <form onSubmit={handleVerify} className="mt-8 space-y-6">
             {/* OTP Input Boxes */}
             <div className="flex justify-center gap-3">
