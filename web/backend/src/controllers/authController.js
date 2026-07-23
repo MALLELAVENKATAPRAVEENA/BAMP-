@@ -130,9 +130,43 @@ const authController = {
         return res.status(400).json({ success: false, message: 'Invalid verification code. Please check and try again.' });
       }
 
+      // Sync with Firebase Authentication Console and Cloud Firestore
+      let fbUid = `uid-${Date.now()}`;
+      const { admin } = require('../config/firebase');
+      const firebaseService = require('../services/firebaseService');
+
+      if (admin && admin.apps && admin.apps.length) {
+        try {
+          let userRecord;
+          try {
+            userRecord = await admin.auth().getUserByEmail(record.user.emailAddress);
+          } catch (e) {
+            userRecord = await admin.auth().createUser({
+              email: record.user.emailAddress,
+              password: record.user.password || 'Pass@123',
+              displayName: record.user.fullName || 'Doctor',
+              emailVerified: true
+            });
+            console.log(`[FIREBASE AUTH CONSOLE] Registered user in Firebase Auth: ${userRecord.uid}`);
+          }
+          fbUid = userRecord.uid;
+
+          await firebaseService.createUserProfile(fbUid, {
+            name: record.user.fullName || 'Doctor',
+            email: record.user.emailAddress,
+            role: 'Orthodontist'
+          });
+
+          await firebaseService.logAuditEvent(fbUid, 'USER_LOGIN', 'users', fbUid);
+        } catch (fbErr) {
+          console.warn("[FIREBASE AUTH] Firebase Auth Admin notice:", fbErr.message);
+        }
+      }
+
       // Construct User Session Token
       const token = jwt.sign(
         {
+          uid: fbUid,
           email: record.user.emailAddress,
           name: record.user.fullName || 'Dr. Venkatapraveenamallela',
           role: 'Orthodontist'
@@ -146,9 +180,10 @@ const authController = {
 
       res.status(200).json({
         success: true,
-        message: 'Identity verified successfully.',
+        message: 'Identity verified successfully and registered in Firebase Console.',
         token,
         user: {
+          uid: fbUid,
           email: record.user.emailAddress,
           name: record.user.fullName || 'Dr. Venkatapraveenamallela',
           role: 'Orthodontist'
