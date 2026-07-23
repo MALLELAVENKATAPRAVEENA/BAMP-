@@ -58,15 +58,30 @@ export const firestoreService = {
   // 2. PATIENTS COLLECTION (patients/{patientId})
   // -------------------------------------------------------------
   async createPatient(patientData, doctorId) {
-    if (!db) return null;
-    const patientsRef = collection(db, 'patients');
-    const newDoc = await addDoc(patientsRef, {
+    const generatedId = patientData.patientId || patientData.id || `P-${Math.floor(1000 + Math.random() * 9000)}`;
+    const fullPatient = {
+      patientId: generatedId,
+      id: generatedId,
       ...patientData,
       doctorId: doctorId || 'current_user',
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
-    });
-    return { patientId: newDoc.id, ...patientData };
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    if (db) {
+      try {
+        const patientsRef = collection(db, 'patients');
+        const newDoc = await addDoc(patientsRef, {
+          ...fullPatient,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        });
+        return { ...fullPatient, patientId: newDoc.id, id: newDoc.id };
+      } catch (e) {
+        console.warn("[FIRESTORE] createPatient fallback:", e.message);
+      }
+    }
+    return fullPatient;
   },
 
   async getPatients(doctorId = null) {

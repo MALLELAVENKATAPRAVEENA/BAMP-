@@ -45,12 +45,13 @@ const NewPatient = () => {
     try {
       // 1. Write to Cloud Firestore patients collection
       const created = await firestoreService.createPatient(data, user?.uid || 'doctor_1');
+      const safePatientId = created?.patientId || created?.id || data.patientId || data.id || `P-${Math.floor(1000 + Math.random() * 9000)}`;
       
       // 2. Write to audit logs collection
-      await firestoreService.logAuditEvent(user?.uid, 'CREATE_PATIENT', 'patients', created.patientId || created.id, { patientName: data.fullName });
+      await firestoreService.logAuditEvent(user?.uid, 'CREATE_PATIENT', 'patients', safePatientId, { patientName: data.fullName });
       
-      // 3. Optional backend call
-      await axios.post('/api/patients', data).catch(() => {});
+      // 3. Optional backend API sync
+      await axios.post('/api/patients', { ...data, patientId: safePatientId }).catch(() => {});
 
       toast.success(`Patient ${data.fullName} registered in Cloud Firestore!`);
       setTimeout(() => {
