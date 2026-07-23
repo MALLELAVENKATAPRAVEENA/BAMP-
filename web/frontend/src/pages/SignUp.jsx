@@ -44,10 +44,10 @@ const SignUp = () => {
     
     setIsLoading(true);
     try {
-      await signup(data.fullName, data.emailAddress, data.password);
-      toast.success('Account created and registered successfully!');
+      const response = await signup(data.fullName, data.emailAddress, data.password);
+      toast.success(response.message || 'OTP verification code sent to your email.');
       setTimeout(() => {
-        navigate('/access-selection');
+        navigate('/otp-verify', { state: { email: data.emailAddress, demoOtp: response?.demoOtp } });
       }, 1000);
     } catch (err) {
       toast.error(err.message || 'Registration failed.');

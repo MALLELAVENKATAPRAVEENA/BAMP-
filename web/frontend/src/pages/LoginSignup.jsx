@@ -40,15 +40,16 @@ const LoginSignup = () => {
   const onSubmit = async (data) => {
     setIsLoading(true);
     try {
+      let response;
       if (isLogin) {
-        await login(data.emailAddress, data.password);
-        toast.success('Signed in successfully.');
+        response = await login(data.emailAddress, data.password);
+        toast.success(response.message || 'Verification OTP sent to your email.');
       } else {
-        await signup(data.fullName, data.emailAddress, data.password);
-        toast.success('Account created and registered successfully!');
+        response = await signup(data.fullName, data.emailAddress, data.password);
+        toast.success(response.message || 'Verification OTP sent to your email.');
       }
       setTimeout(() => {
-        navigate('/access-selection');
+        navigate('/otp-verify', { state: { email: data.emailAddress, demoOtp: response?.demoOtp } });
       }, 1000);
     } catch (err) {
       toast.error(err.message || 'Authentication request rejected.');
